@@ -1,0 +1,74 @@
+start:
+  say Typing(1000)
+  say Question(
+	title = "Veux tu voir des arbres remarquables ?",
+	buttons = [
+	  Button("Oui"),
+	  Button("Non")
+	]
+  )
+  hold
+  if(event == "Oui") {
+	say Typing(1000)
+	say "C'est parti !"
+	goto run
+  }else {
+	say Typing(1000)
+	say "Oh le petit con !"
+	goto run
+  }
+run:
+  say Typing(1000)
+  say "Quelle est ton adresse ?"
+  hold
+  remember address = event
+  if(address.contains_regex("\d+")){//\s[A-z]+\s[A-z]+.+")){
+	say "Good address !"
+  }else {
+	say "Not an address"
+  }
+  goto getLocation
+getLocation:
+  do req = HTTP("https://opendata.paris.fr/api/records/1.0/search/?dataset=adresse_paris&q={{address}}").get()
+  do res = req.send()
+  do gps = res.records[0].fields.geom_x_y
+  remember gps_x = gps[0]
+  remember gps_y = gps[1]
+  say Debug(gps)
+  goto getTrees
+getTrees:
+  do req = HTTP("https://opendata.paris.fr/api/records/1.0/search/?dataset=arbresremarquablesparis&q=%23distance(location%2C+%22{{gps_x}}%2C+{{gps_y}}%22%2C+500)&facet=genre&facet=espece&facet=stadedeveloppement&facet=varieteoucultivar&facet=dateplantation&facet=libellefrancais").get()
+  do res = req.send()
+  do trees = res.records
+  remember multiArbre =[]
+  do nomArbre = trees[0].fields.libellefrancais
+  do tailleArbre = trees[0].fields.hauteurenm
+  do adresseArbre = trees[0].fields.adresse
+  foreach(item, i) in trees {
+    do multiArbre.push(item)
+  }
+goto talkTrees
+talkTrees:
+  say "Il y a un super {{nomArbre}} de {{tailleArbre}} mètres à moins de 500 mètres de toi !"
+  say Question(
+	  title = "Tu veux l'adresse de cet incroyable végétal ?",
+	  buttons = [
+	    Button("Avec plaisir ! "),
+	    Button("Y'en a pas un autre ?")
+	  ]
+  )
+  hold
+  if (event == "Avec plaisir ! "){
+	  say "Voici l'adresse : {{adresseArbre}}"
+  }else{
+	  say "Attend je regarde"
+    if (multiArbre.length()>1){
+      do req = HTTP("https://opendata.paris.fr/api/records/1.0/search/?dataset=arbresremarquablesparis&q=%23distance(location%2C+%22{{gps_x}}%2C+{{gps_y}}%22%2C+500)&facet=genre&facet=espece&facet=stadedeveloppement&facet=varieteoucultivar&facet=dateplantation&facet=libellefrancais").get()
+      do res = req.send()
+      do trees = res.records
+      do nomArbre = trees[2].fields.libellefrancais
+      do tailleArbre = trees[2].fields.hauteurenm
+      do adresseArbre = trees[2].fields.adresse
+      say "Sinon il y a un super {{nomArbre}} de {{tailleArbre}} mètres à moins de 500 mètres de toi !"
+    }
+  }
